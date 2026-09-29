@@ -1,0 +1,190 @@
+@import 'tailwindcss';
+
+:root {
+  --bg: #fafaf8;
+  --surface: #ffffff;
+  --surface-alt: #f3ede5;
+  --text: #1c1917;
+  --text-secondary: #78716c;
+  --text-muted: #a8a29e;
+  --border: #e7e2da;
+  --accent: #ff6b35;
+  --accent-hover: #e85a26;
+  --accent-tint: rgba(255, 107, 53, 0.1);
+
+  --font-display: var(--font-fraunces), var(--font-noto-serif-ka), Georgia, serif;
+  --font-body: var(--font-outfit), var(--font-noto-sans-ka), system-ui, sans-serif;
+}
+
+[data-theme='dark'] {
+  --bg: #17140f;
+  --surface: #211d18;
+  --surface-alt: #2a2420;
+  --text: #fafaf8;
+  --text-secondary: #b5aea6;
+  --text-muted: #857d74;
+  --border: #362f28;
+  --accent: #ff6b35;
+  --accent-hover: #ff8259;
+  --accent-tint: rgba(255, 107, 53, 0.16);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  transition: background-color 0.2s ease, color 0.2s ease;
+  /* Safety net: nothing on the page should ever force horizontal scroll */
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+body {
+  margin: 0;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+}
+
+img {
+  max-width: 100%;
+}
+
+/* ---------------------------------------------------------------------
+   Navbar responsive behavior.
+   NOTE: these use real, defined classes (not Tailwind's `hidden md:flex`,
+   which was the bug last time — that combo needs Tailwind's responsive
+   variants configured correctly, and `mobile-hide` was never a real class
+   at all). Written as plain CSS so it works regardless of Tailwind's setup.
+--------------------------------------------------------------------- */
+.navbar-desktop-links {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.navbar-right-desktop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.navbar-mobile-toggle {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: var(--text);
+}
+
+@media (max-width: 860px) {
+  .navbar-desktop-links {
+    display: none;
+  }
+  .navbar-right-desktop {
+    display: none;
+  }
+  .navbar-mobile-toggle {
+    display: flex;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Grids used across Home / Courses / Categories / About.
+   !important is required here because these elements also carry an
+   inline `style` with gridTemplateColumns — inline styles otherwise
+   always win over stylesheet rules, even inside a media query.
+--------------------------------------------------------------------- */
+.grid-3,
+.grid-4 {
+  display: grid;
+  gap: 20px;
+}
+
+@media (max-width: 860px) {
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Home hero: text + image side by side on desktop, stacked on mobile */
+@media (max-width: 860px) {
+  .home-hero-grid {
+    grid-template-columns: 1fr !important;
+    gap: 32px !important;
+  }
+  .hero-visual {
+    order: -1;
+  }
+}
+
+/* Courses listing: sidebar filters + results */
+@media (max-width: 860px) {
+  .courses-layout {
+    flex-direction: column !important;
+  }
+  .courses-layout > aside {
+    width: 100% !important;
+    position: static !important;
+  }
+}
+
+/* Categories grid: two-column cards with a thumbnail */
+@media (max-width: 700px) {
+  .categories-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .category-image {
+    width: 110px !important;
+  }
+}
+
+/* About page: mission split + team/stats grids already covered by grid-3/grid-4 */
+@media (max-width: 860px) {
+  .split-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Auth pages: form + visual side panel */
+@media (max-width: 860px) {
+  .auth-layout {
+    grid-template-columns: 1fr !important;
+  }
+  .auth-visual {
+    display: none !important;
+  }
+  .auth-form-panel {
+    padding: 40px 24px !important;
+  }
+}
+
+/* Course detail: hero content + sticky price card */
+@media (max-width: 960px) {
+  .course-hero-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .price-card {
+    position: static !important;
+  }
+}

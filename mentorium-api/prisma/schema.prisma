@@ -1,0 +1,291 @@
+// Mentorium database schema
+// Run `npx prisma migrate dev --name init` after setting DATABASE_URL in .env
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Users
+// ---------------------------------------------------------------------------
+
+enum Role {
+  STUDENT
+  INSTRUCTOR
+  ADMIN
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String? // null for OAuth-only accounts
+  name         String
+  avatarUrl    String?
+  role         Role     @default(STUDENT)
+  locale       String   @default("ka") // "ka" | "en" — UI language preference
+
+  // Instructor-only fields (kept on User rather than a separate table —
+  // simpler for v1 since a user can be both student and instructor)
+  title String? // e.g. "UX Design Mentor" — shown under name on public profile
+  bio   String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  coursesTaught Course[]          @relation("InstructorCourses")
+  enrollments   Enrollment[]
+  reviews       Review[]
+  wishlist      WishlistItem[]
+  certificates  Certificate[]
+  orders        Order[]
+
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// Catalog: categories, courses, sections, lectures, tags
+// ---------------------------------------------------------------------------
+
+model Category {
+  id            String  @id @default(cuid())
+  slug          String  @unique
+  nameKa        String
+  nameEn        String?
+  descriptionKa String? @db.Text
+  descriptionEn String? @db.Text
+  imageUrl      String?
+
+  courses   Course[]
+  createdAt DateTime @default(now())
+
+  @@map("categories")
+}
+
+enum CourseLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  ALL_LEVELS
+}
+
+enum CourseStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+model Course {
+  id            String  @id @default(cuid())
+  slug          String  @unique
+  titleKa       String
+  titleEn       String?
+  descriptionKa String? @db.Text
+  descriptionEn String? @db.Text
+
+  price         Decimal @db.Decimal(10, 2)
+  originalPrice Decimal? @db.Decimal(10, 2)
+
+  level        CourseLevel  @default(ALL_LEVELS)
+  language     String       @default("ka")
+  thumbnailUrl String?
+  status       CourseStatus @default(DRAFT)
+
+  instructorId String
+  instructor   User   @relation("InstructorCourses", fields: [instructorId], references: [id])
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  sections     Section[]
+  enrollments  Enrollment[]
+  reviews      Review[]
+  wishlistedBy WishlistItem[]
+  tags         CourseTag[]
+  orderItems   OrderItem[]
+  certificates Certificate[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([instructorId])
+  @@index([status])
+  @@map("courses")
+}
+
+model Tag {
+  id      String      @id @default(cuid())
+  name    String      @unique
+  courses CourseTag[]
+
+  @@map("tags")
+}
+
+// Explicit join table (rather than Prisma's implicit m-n) so we can add
+// fields like "featured" or "addedAt" later without a migration headache.
+model CourseTag {
+  courseId String
+  tagId    String
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([courseId, tagId])
+  @@map("course_tags")
+}
+
+model Section {
+  id       String  @id @default(cuid())
+  courseId String
+  course   Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  titleKa  String
+  titleEn  String?
+  order    Int
+
+  lectures Lecture[]
+
+  @@index([courseId])
+  @@map("sections")
+}
+
+model Lecture {
+  id              String  @id @default(cuid())
+  sectionId       String
+  section         Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  titleKa         String
+  titleEn         String?
+  videoId         String? // Bunny.net Stream video GUID — see tech stack plan
+  durationSeconds Int     @default(0)
+  order           Int
+  isPreview       Boolean @default(false) // playable without enrolling
+
+  progress LectureProgress[]
+
+  @@index([sectionId])
+  @@map("lectures")
+}
+
+// ---------------------------------------------------------------------------
+// Learning: enrollments, progress, reviews, wishlist, certificates
+// ---------------------------------------------------------------------------
+
+model Enrollment {
+  id       String @id @default(cuid())
+  userId   String
+  user     User   @relation(fields: [userId], references: [id])
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id])
+
+  progressPercent Int       @default(0)
+  enrolledAt      DateTime  @default(now())
+  completedAt     DateTime?
+
+  lectureProgress LectureProgress[]
+
+  @@unique([userId, courseId]) // can't enroll in the same course twice
+  @@index([courseId])
+  @@map("enrollments")
+}
+
+model LectureProgress {
+  id             String     @id @default(cuid())
+  enrollmentId   String
+  enrollment     Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lectureId      String
+  lecture        Lecture    @relation(fields: [lectureId], references: [id], onDelete: Cascade)
+  completed      Boolean    @default(false)
+  watchedSeconds Int        @default(0)
+  updatedAt      DateTime   @updatedAt
+
+  @@unique([enrollmentId, lectureId])
+  @@map("lecture_progress")
+}
+
+model Review {
+  id       String @id @default(cuid())
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User   @relation(fields: [userId], references: [id])
+
+  rating  Int // 1-5
+  comment String? @db.Text
+
+  createdAt DateTime @default(now())
+
+  @@unique([courseId, userId]) // one review per student per course
+  @@index([courseId])
+  @@map("reviews")
+}
+
+model WishlistItem {
+  userId   String
+  user     User     @relation(fields: [userId], references: [id])
+  courseId String
+  course   Course   @relation(fields: [courseId], references: [id])
+  addedAt  DateTime @default(now())
+
+  @@id([userId, courseId])
+  @@map("wishlist_items")
+}
+
+model Certificate {
+  id       String @id @default(cuid())
+  userId   String
+  user     User   @relation(fields: [userId], references: [id])
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id])
+
+  issuedAt DateTime @default(now())
+  fileUrl  String? // generated PDF, stored in Bunny/R2 per tech stack plan
+
+  @@unique([userId, courseId])
+  @@map("certificates")
+}
+
+// ---------------------------------------------------------------------------
+// Commerce: orders + line items (a cart can hold multiple courses)
+// ---------------------------------------------------------------------------
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+model Order {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  totalAmount Decimal     @db.Decimal(10, 2)
+  currency    String      @default("GEL")
+  status      OrderStatus @default(PENDING)
+
+  // Payment gateway details — see tech stack plan (QuickPay.ge aggregator
+  // covering BOG + TBC, or a direct bank integration)
+  provider    String?
+  providerRef String?
+
+  items     OrderItem[]
+  createdAt DateTime    @default(now())
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id       String  @id @default(cuid())
+  orderId  String
+  order    Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  courseId String
+  course   Course  @relation(fields: [courseId], references: [id])
+  price    Decimal @db.Decimal(10, 2) // price at time of purchase, in case course price changes later
+
+  @@map("order_items")
+}
